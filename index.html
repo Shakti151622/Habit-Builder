@@ -1219,24 +1219,14 @@ input::placeholder,textarea::placeholder{color:var(--t3)}
   <div class="sp-progress"><div class="sp-progress-fill"></div></div>
 </div>
 
-<!-- ════════════════ STAGE 2: VIDEO ════════════════ -->
-<div id="videoScreen" style="position:fixed;inset:0;z-index:9998;background:#000;display:none;align-items:center;justify-content:center">
-  <!-- Loading indicator while video fetches -->
-  <div id="videoLoader" style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;z-index:2">
-    <div style="width:50px;height:50px;border-radius:50%;border:3px solid rgba(233,168,76,.2);border-top-color:#E9A84C;animation:spin .8s linear infinite"></div>
-    <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:2px;color:rgba(255,255,255,.4)">LOADING...</div>
-  </div>
-  <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
-
-  <video id="splashVideo"
-    autoplay muted playsinline
-    style="width:100%;height:100%;object-fit:cover;display:block;opacity:0;transition:opacity .4s">
+<!-- ════════════════ STAGE 2: VIDEO (shown after splash) ════════════════ -->
+<div id="videoScreen" style="position:fixed;inset:0;z-index:9997;background:#000;display:none;align-items:center;justify-content:center">
+  <video id="splashVideo" playsinline
+    style="width:100%;height:100%;object-fit:cover;display:block">
     <source src="https://res.cloudinary.com/dknnkoa7w/video/upload/v1773771651/VIDEO-2026-02-27-10-01-01_vs5wnh.mp4" type="video/mp4">
   </video>
-  <!-- Skip -->
   <button onclick="videoEnded()" style="position:absolute;top:20px;right:20px;background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.35);color:#fff;font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:2px;padding:8px 18px;border-radius:20px;cursor:pointer;z-index:4">SKIP ›</button>
-  <!-- Sound toggle -->
-  <button id="soundBtn" onclick="toggleVideoSound()" style="position:absolute;bottom:28px;right:20px;background:rgba(0,0,0,.5);border:1px solid rgba(255,255,255,.25);color:#fff;font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:1px;padding:8px 16px;border-radius:20px;cursor:pointer;z-index:4;display:none">🔇 SOUND OFF</button>
+  <button id="soundBtn" onclick="toggleVideoSound()" style="display:none;position:absolute;bottom:28px;right:20px;background:rgba(0,0,0,.6);border:1px solid rgba(255,255,255,.2);color:#fff;font-family:'JetBrains Mono',monospace;font-size:11px;padding:8px 16px;border-radius:20px;cursor:pointer;z-index:4">🔊 UNMUTE</button>
 </div>
 
 <!-- ════════════════ SETUP ════════════════ -->
@@ -3886,14 +3876,7 @@ function escH(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;')
 // ════════════════════════════════════════════
 //  CINEMATIC SPLASH
 // ════════════════════════════════════════════
-// ════════════════════════════════════════════
-//  TWO-STAGE SPLASH
-//  Stage 1: Video plays fullscreen
-//  Stage 2: Cinematic animated splash (5s)
-//  Then: App loads
-// ════════════════════════════════════════════
-// ════════════════════════════════════════════
-//  TWO-STAGE INTRO: Splash → Video → App
+//  INTRO: Splash (5s) → Video → App
 // ════════════════════════════════════════════
 var _splashDone = false;
 var _videoStageDone = false;
@@ -3955,7 +3938,7 @@ function dismissSplash(){
 
 function skipSplash(){ dismissSplash(); }
 
-// ── STAGE 2: Video (muted autoplay — always works) ──
+// ── STAGE 2: Video ──
 function startVideoStage(){
   var vs  = document.getElementById('videoScreen');
   var vid = document.getElementById('splashVideo');
@@ -3964,35 +3947,30 @@ function startVideoStage(){
   vs.style.display = 'flex';
   vs.style.zIndex  = '9999';
 
-  vid.muted  = true;
-  vid.volume = 1.0;
-  vid.loop   = false;
+  vid.muted = true;
 
-  // Fade in video when ready, hide loader
-  vid.addEventListener('canplay', function(){
-    var loader = document.getElementById('videoLoader');
-    if(loader) loader.style.display = 'none';
-    vid.style.opacity = '1';
-    var btn = document.getElementById('soundBtn');
-    if(btn) btn.style.display = 'block';
-  }, {once:true});
+  // If video hasn't started within 4 seconds → skip straight to app
+  var loadTimer = setTimeout(function(){
+    if(!_videoStageDone) videoEnded();
+  }, 4000);
 
-  vid.play().catch(function(){ videoEnded(); });
-
-  // Try to unmute after play starts (works since user interacted with splash)
+  // Once playing: clear timer, try unmute (works since user tapped splash)
   vid.addEventListener('playing', function(){
-    vid.muted = false;
-    var btn = document.getElementById('soundBtn');
-    if(btn) btn.textContent = '🔊 SOUND ON';
+    clearTimeout(loadTimer);
+    setTimeout(function(){
+      vid.muted = false;
+      var btn = document.getElementById('soundBtn');
+      if(btn){ btn.style.display='block'; btn.textContent='🔊 SOUND ON'; }
+    }, 200);
   }, {once:true});
 
   vid.addEventListener('ended', videoEnded);
-  vid.addEventListener('error', function(e){
-    console.log('Video error:', e, vid.error);
-    videoEnded();
-  });
+  vid.addEventListener('error', function(){ clearTimeout(loadTimer); videoEnded(); });
 
-  // Hard timeout 15s
+  var p = vid.play();
+  if(p) p.catch(function(){ clearTimeout(loadTimer); videoEnded(); });
+
+  // Hard max 15s
   setTimeout(function(){ if(!_videoStageDone) videoEnded(); }, 15000);
 }
 
